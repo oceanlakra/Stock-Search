@@ -5,6 +5,25 @@ from datetime import datetime, timedelta
 from reddit_stock_scraper import RedditStockScraper
 from text_preprocessor import TextPreprocessor
 from stock_prediction_model import StockPredictionModel
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file (local development)
+load_dotenv()
+
+# Try to get credentials from Streamlit secrets first, fall back to environment variables
+if hasattr(st, 'secrets'):
+    CLIENT_ID = st.secrets.get("REDDIT_CLIENT_ID", os.getenv("REDDIT_CLIENT_ID"))
+    CLIENT_SECRET = st.secrets.get("REDDIT_CLIENT_SECRET", os.getenv("REDDIT_CLIENT_SECRET"))
+    USER_AGENT = st.secrets.get("REDDIT_USER_AGENT", os.getenv("REDDIT_USER_AGENT"))
+else:
+    CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
+    CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET")
+    USER_AGENT = os.getenv("REDDIT_USER_AGENT")
+
+# Validate credentials
+if not all([CLIENT_ID, CLIENT_SECRET, USER_AGENT]):
+    raise ValueError("Missing Reddit API credentials. Please check your environment variables or Streamlit secrets.")
 
 # Update the STOCK_INDICES dictionary with a comprehensive list
 STOCK_INDICES = {
@@ -101,11 +120,6 @@ STOCK_INDICES = {
         },
     }
 }
-
-# Reddit API credentials
-CLIENT_ID = "1BhQqDXxVbYM0oXt-q3zvA"
-CLIENT_SECRET = "4bPdbo4vtLRDcmyrO4k8-5GzKnNddA"
-USER_AGENT = "python:com.example.stock:v1.0 (by /u/Dangerous_Horse1773)"
 
 def create_candlestick_chart(df, sentiment_data=None):
     """Create a candlestick chart"""

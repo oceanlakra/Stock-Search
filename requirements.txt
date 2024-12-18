@@ -21,4 +21,7 @@ praw>=7.7.0
 yfinance>=0.2.18
 
 # Progress bars and utilities
-tqdm>=4.65.0 
+tqdm>=4.65.0
+
+# Environment variables
+python-dotenv==1.0.0
