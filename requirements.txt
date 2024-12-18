@@ -1,0 +1,24 @@
+# Data manipulation and analysis
+pandas>=1.5.0
+numpy>=1.21.0
+
+# Machine Learning
+scikit-learn>=1.0.0
+torch>=2.0.0
+
+# Natural Language Processing
+nltk>=3.8.1
+transformers>=4.30.0
+
+# Data Visualization
+plotly>=5.13.0
+
+# Web Interface
+streamlit>=1.22.0
+
+# API Clients
+praw>=7.7.0
+yfinance>=0.2.18
+
+# Progress bars and utilities
+tqdm>=4.65.0 
