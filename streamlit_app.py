@@ -11,15 +11,28 @@ from dotenv import load_dotenv
 # Load environment variables from .env file (local development)
 load_dotenv()
 
-# Try to get credentials from Streamlit secrets first, fall back to environment variables
-if hasattr(st, 'secrets'):
-    CLIENT_ID = st.secrets.get("REDDIT_CLIENT_ID", os.getenv("REDDIT_CLIENT_ID"))
-    CLIENT_SECRET = st.secrets.get("REDDIT_CLIENT_SECRET", os.getenv("REDDIT_CLIENT_SECRET"))
-    USER_AGENT = st.secrets.get("REDDIT_USER_AGENT", os.getenv("REDDIT_USER_AGENT"))
-else:
-    CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
-    CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET")
-    USER_AGENT = os.getenv("REDDIT_USER_AGENT")
+# Function to get credentials from environment or secrets
+def get_credentials():
+    # Check if running on Streamlit Cloud
+    try:
+        return {
+            "client_id": st.secrets["REDDIT_CLIENT_ID"],
+            "client_secret": st.secrets["REDDIT_CLIENT_SECRET"],
+            "user_agent": st.secrets["REDDIT_USER_AGENT"]
+        }
+    except (FileNotFoundError, KeyError):
+        # Fallback to environment variables for local development
+        return {
+            "client_id": os.getenv("REDDIT_CLIENT_ID"),
+            "client_secret": os.getenv("REDDIT_CLIENT_SECRET"),
+            "user_agent": os.getenv("REDDIT_USER_AGENT")
+        }
+
+# Get credentials
+credentials = get_credentials()
+CLIENT_ID = credentials["client_id"]
+CLIENT_SECRET = credentials["client_secret"]
+USER_AGENT = credentials["user_agent"]
 
 # Validate credentials
 if not all([CLIENT_ID, CLIENT_SECRET, USER_AGENT]):
