@@ -32,8 +32,8 @@ This project leverages Natural Language Processing (NLP) and Machine Learning to
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/yourusername/stock-market-sentiment-analyzer.git
-   cd stock-market-sentiment-analyzer
+   git clone https://github.com/yourusername/stocker-ai.git
+   cd stocker-ai
    ```
 
 2. **Create Virtual Environment** (Recommended)
