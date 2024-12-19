@@ -281,119 +281,141 @@ def main():
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days_back)
 
-            with st.spinner("Analyzing market data and sentiment..."):
-                # Get market data
-                market_data = predictor.get_stock_data(
-                    symbol=symbol,
-                    start_date=start_date,
-                    end_date=end_date
+            # Create progress tracking elements
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            # Step 1: Market Data (20%)
+            status_text.text("📊 Step 1/5: Fetching market data from Yahoo Finance...")
+            market_data = predictor.get_stock_data(
+                symbol=symbol,
+                start_date=start_date,
+                end_date=end_date
+            )
+            progress_bar.progress(20)
+            
+            # Step 2: Reddit Data (40%)
+            status_text.text("🤖 Step 2/5: Scraping Reddit discussions...")
+            subreddits = ['stocks', 'investing', 'wallstreetbets']
+            raw_data = scraper.scrape_stock_discussions(
+                subreddits, 
+                index_details["keywords"]
+            )
+            progress_bar.progress(40)
+
+            # Step 3: Text Processing (60%)
+            status_text.text("🔍 Step 3/5: Processing and cleaning text data...")
+            raw_data['cleaned_text'] = raw_data['body'].apply(preprocessor.clean_text)
+            progress_bar.progress(60)
+
+            # Step 4: Sentiment Analysis (80%)
+            status_text.text("💭 Step 4/5: Analyzing market sentiment...")
+            raw_data['sentiment'] = raw_data['cleaned_text'].apply(preprocessor.get_sentiment)
+            raw_data['date'] = pd.to_datetime(raw_data['created_utc'], unit='s')
+            raw_data.set_index('date', inplace=True)
+            progress_bar.progress(80)
+
+            # Step 5: Visualization (100%)
+            status_text.text("📈 Step 5/5: Preparing visualizations...")
+            fig = create_candlestick_chart(market_data, raw_data)
+            progress_bar.progress(100)
+            
+            # Clear progress indicators
+            status_text.empty()
+            progress_bar.empty()
+
+            # Display results
+            st.plotly_chart(fig)
+
+            # Display sentiment summary
+            st.header("Sentiment Analysis Summary")
+            summary = get_sentiment_summary(raw_data, market_data)
+            
+            # Create three columns for metrics
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("Current Sentiment", f"{summary['Recent Sentiment']:.3f}")
+                st.metric("5-Day Sentiment MA", f"{summary['Sentiment MA5']:.3f}")
+            
+            with col2:
+                st.metric("20-Day Sentiment MA", f"{summary['Sentiment MA20']:.3f}")
+                st.metric("Mention Count", summary['Mention Count'])
+            
+            with col3:
+                st.metric("Recent Price Change", f"{summary['Recent Price Change %']}%")
+            
+            # Prediction
+            sentiment_trend = summary['Sentiment MA5'] - summary['Sentiment MA20']
+            prediction = "Bullish 📈" if sentiment_trend > 0 else "Bearish 📉"
+            confidence = abs(sentiment_trend) * 100
+            
+            st.header("Market Prediction")
+            st.subheader(f"Prediction: {prediction}")
+            
+            # Fix for progress bar
+            normalized_confidence = min(abs(sentiment_trend), 1.0)  # Ensure value is between 0 and 1
+            st.progress(normalized_confidence)
+            st.caption(f"Confidence: {min(confidence, 100):.1f}%")
+            
+            # Add market summary
+            st.header("Market Summary")
+            st.markdown(get_market_summary(summary, sentiment_trend))
+
+            # Display recent relevant posts
+            st.header("Recent Relevant Discussions")
+            recent_posts = raw_data.sort_index(ascending=False).head(3)
+            if len(recent_posts) > 0:
+                for idx, row in recent_posts.iterrows():
+                    with st.expander(f"{row['title']} (Sentiment: {row['sentiment']:.2f})"):
+                        st.write(f"Subreddit: r/{row['subreddit']}")
+                        st.write(f"Score: {row['score']} | Comments: {row['num_comments']}")
+                        st.write(row['body'][:500] + "..." if len(row['body']) > 500 else row['body'])
+            else:
+                st.write("No recent discussions found.")
+
+            # Price Prediction
+            st.header("Next Day Price Prediction")
+            
+            price_prediction = predict_next_day_price(
+                market_data, 
+                summary['Recent Sentiment']
+            )
+            
+            # Create columns for prediction display
+            pred_col1, pred_col2 = st.columns(2)
+            
+            with pred_col1:
+                st.metric(
+                    "Current Price", 
+                    f"${price_prediction['current_price']:.2f}",
+                    f"{price_prediction['predicted_change']:.2f}%"
                 )
-                
-                # Scrape Reddit data
-                subreddits = ['stocks', 'investing', 'wallstreetbets']
-                raw_data = scraper.scrape_stock_discussions(
-                    subreddits, 
-                    index_details["keywords"]
+                st.caption("Predicted % change for tomorrow")
+            
+            with pred_col2:
+                st.metric(
+                    "Predicted Price", 
+                    f"${price_prediction['predicted_price']:.2f}"
                 )
-
-                # Process sentiment
-                raw_data['cleaned_text'] = raw_data['body'].apply(preprocessor.clean_text)
-                raw_data['sentiment'] = raw_data['cleaned_text'].apply(preprocessor.get_sentiment)
-                raw_data['date'] = pd.to_datetime(raw_data['created_utc'], unit='s')
-                raw_data.set_index('date', inplace=True)
-
-                # Display combined chart
-                st.plotly_chart(create_candlestick_chart(market_data, raw_data))
-
-                # Display sentiment summary
-                st.header("Sentiment Analysis Summary")
-                summary = get_sentiment_summary(raw_data, market_data)
-                
-                # Create three columns for metrics
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    st.metric("Current Sentiment", f"{summary['Recent Sentiment']:.3f}")
-                    st.metric("5-Day Sentiment MA", f"{summary['Sentiment MA5']:.3f}")
-                
-                with col2:
-                    st.metric("20-Day Sentiment MA", f"{summary['Sentiment MA20']:.3f}")
-                    st.metric("Mention Count", summary['Mention Count'])
-                
-                with col3:
-                    st.metric("Recent Price Change", f"{summary['Recent Price Change %']}%")
-                
-                # Prediction
-                sentiment_trend = summary['Sentiment MA5'] - summary['Sentiment MA20']
-                prediction = "Bullish 📈" if sentiment_trend > 0 else "Bearish 📉"
-                confidence = abs(sentiment_trend) * 100
-                
-                st.header("Market Prediction")
-                st.subheader(f"Prediction: {prediction}")
-                
-                # Fix for progress bar
-                normalized_confidence = min(abs(sentiment_trend), 1.0)  # Ensure value is between 0 and 1
-                st.progress(normalized_confidence)
-                st.caption(f"Confidence: {min(confidence, 100):.1f}%")
-                
-                # Add market summary
-                st.header("Market Summary")
-                st.markdown(get_market_summary(summary, sentiment_trend))
-
-                # Display recent relevant posts
-                st.header("Recent Relevant Discussions")
-                recent_posts = raw_data.sort_index(ascending=False).head(3)
-                if len(recent_posts) > 0:
-                    for idx, row in recent_posts.iterrows():
-                        with st.expander(f"{row['title']} (Sentiment: {row['sentiment']:.2f})"):
-                            st.write(f"Subreddit: r/{row['subreddit']}")
-                            st.write(f"Score: {row['score']} | Comments: {row['num_comments']}")
-                            st.write(row['body'][:500] + "..." if len(row['body']) > 500 else row['body'])
-                else:
-                    st.write("No recent discussions found.")
-
-                # Price Prediction
-                st.header("Next Day Price Prediction")
-                
-                price_prediction = predict_next_day_price(
-                    market_data, 
-                    summary['Recent Sentiment']
-                )
-                
-                # Create columns for prediction display
-                pred_col1, pred_col2 = st.columns(2)
-                
-                with pred_col1:
-                    st.metric(
-                        "Current Price", 
-                        f"${price_prediction['current_price']:.2f}",
-                        f"{price_prediction['predicted_change']:.2f}%"
-                    )
-                    st.caption("Predicted % change for tomorrow")
-                
-                with pred_col2:
-                    st.metric(
-                        "Predicted Price", 
-                        f"${price_prediction['predicted_price']:.2f}"
-                    )
-                    st.caption("Expected price for tomorrow")
-                
-                # Prediction details
-                st.subheader("Prediction Analysis")
-                st.write(f"""
-                - Technical Analysis Confidence: {price_prediction['technical_confidence']:.1f}%
-                - Sentiment Impact: {price_prediction['sentiment_impact']:.1f}%
-                - Prediction combines:
-                    * 70% weight on technical indicators (SMA, RSI, Momentum)
-                    * 30% weight on market sentiment
-                """)
-                
-                # Add prediction disclaimer
-                st.warning("""
-                **Disclaimer**: This prediction is based on historical data and sentiment analysis. 
-                Market movements are subject to many external factors and may not follow predicted patterns. 
-                This should not be considered as financial advice.
-                """)
+                st.caption("Expected price for tomorrow")
+            
+            # Prediction details
+            st.subheader("Prediction Analysis")
+            st.write(f"""
+            - Technical Analysis Confidence: {price_prediction['technical_confidence']:.1f}%
+            - Sentiment Impact: {price_prediction['sentiment_impact']:.1f}%
+            - Prediction combines:
+                * 70% weight on technical indicators (SMA, RSI, Momentum)
+                * 30% weight on market sentiment
+            """)
+            
+            # Add prediction disclaimer
+            st.warning("""
+            **Disclaimer**: This prediction is based on historical data and sentiment analysis. 
+            Market movements are subject to many external factors and may not follow predicted patterns. 
+            This should not be considered as financial advice.
+            """)
 
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
